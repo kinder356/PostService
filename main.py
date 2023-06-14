@@ -62,7 +62,7 @@ class PostServiceAPI:
         """)
 
     def setup_interface(self):
-        window = Window(self.get_statuses, self.add_new_user, self.get_all_users)
+        window = Window(self.get_statuses, self.add_new_user, self.get_all_users, self.edit_user, self.get_user_by_id)
         window.mainloop()
 
     def get_all_users(self):
@@ -91,6 +91,14 @@ class PostServiceAPI:
     def get_statuses(self) -> dict[str: int]:
         self.cur.execute("SELECT * FROM userstatuses")
         return dict((v, k) for k, v in self.cur.fetchall())
+
+    def edit_user(self, user: User):
+        self.cur.execute("UPDATE users SET login=?, password=?, name=?, surname=?, phone=?, email=?, birthdate=?, status=? WHERE userid=?", (user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
+             user.status, user.id))
+
+    def get_user_by_id(self, id: int) -> User:
+        self.cur.execute("SELECT * FROM users WHERE userid=?", (id,))
+        return User(*self.cur.fetchone())
 
 
 API = PostServiceAPI()

@@ -14,6 +14,7 @@ class User:
     _email = None
     _birthdate = None
     _status = 2
+
     # ...
 
     @property
@@ -220,7 +221,7 @@ class Order:
 
 class Window(Tk):
 
-    def __init__(self, get_statuses_dict_func, add_user_func, load_user_func):
+    def __init__(self, get_statuses_dict_func, add_user_func, load_user_func, edit_user_func, get_user_by_id_func):
         super().__init__()
         self.title("Post Service")
         self.geometry("+300+100")
@@ -230,11 +231,13 @@ class Window(Tk):
         self.add_user_api_func = add_user_func
         self.load_users_api_func = load_user_func
         self.get_statuses_api_func = get_statuses_dict_func
+        self.edit_user_api_func = edit_user_func
+        self.get_user_by_id_api_func = get_user_by_id_func
 
         notebook = ttk.Notebook()
         notebook.pack(expand=True, fill=BOTH)
 
-        # --- tabs ---
+        # --- tabs init ---
 
         frame1 = ttk.Frame(notebook)
         frame1.pack()
@@ -261,95 +264,27 @@ class Window(Tk):
         self.edit_id_error = Label(master=frame3)
         self.edit_id_error.grid(row=0, column=2, padx=(10, 3), pady=10)
 
-        self.find_user_button = ttk.Button(frame3, text='Найти', command=self.find_user_for_edit)
+        edit_user_properties_widgets: dict = self.initialization_user_properties_widgets(frame3, 2)
+        edit_user_inputs = [i["input"] for i in edit_user_properties_widgets.values()]
+
+        self.find_user_button = ttk.Button(frame3, text='Найти',
+                                           command=lambda: self.find_user_for_edit_by_id(edit_user_inputs))
         self.find_user_button.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10))
-        
+
+        self.edit_user_button = ttk.Button(master=frame3, text="Сохранить",
+                                          command=lambda: self.edit_user(edit_user_inputs))
+        self.edit_user_button.grid(row=10, column=1, padx=3, pady=3)
+
         # --- tab 2, register user ---
 
         self.add_user_label = Label(master=frame2, text="Добавление пользователя")
         self.add_user_label.grid(row=0, column=0, columnspan=3, padx=3, pady=3)
 
-        self.login_label = Label(master=frame2, text="Логин*:")
-        self.login_label.grid(row=1, column=0, padx=3, pady=3)
-        self.login_input = ttk.Entry(master=frame2)
-        self.login_input.grid(row=1, column=1, padx=3, pady=3)
-        self.login_error = Label(master=frame2)
-        self.login_error.grid(row=1, column=2, padx=3, pady=3)
-        self.login_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'[a-zA-Z0-9!@#$%^&*()=_+?/><.,~`-]{8,}', self.login_error,
-                                         'Неверная длина или символы')), '%P'))
+        add_user_properties_widgets: dict = self.initialization_user_properties_widgets(frame2, 1)
+        add_user_inputs = [i["input"] for i in add_user_properties_widgets.values()]
 
-        self.password_label = Label(master=frame2, text="Пароль*:")
-        self.password_label.grid(row=2, column=0, padx=3, pady=3)
-        self.password_input = ttk.Entry(master=frame2)
-        self.password_input.grid(row=2, column=1, padx=3, pady=3)
-        self.password_error = Label(master=frame2)
-        self.password_error.grid(row=2, column=2, padx=3, pady=3)
-        self.password_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'[a-zA-Z0-9!@#$%^&*()=_+?/><.,~`-]{8,}', self.password_error,
-                                         'Неверная длина или неверные символы')), '%P'))
-
-        self.name_label = Label(master=frame2, text="Имя*:")
-        self.name_label.grid(row=3, column=0, padx=3, pady=3)
-        self.name_input = ttk.Entry(master=frame2)
-        self.name_input.grid(row=3, column=1, padx=3, pady=3)
-        self.name_error = Label(master=frame2)
-        self.name_error.grid(row=3, column=2, padx=3, pady=3)
-        self.name_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'^(?:[А-ЯЁ][а-яё]*|[A-Z][a-z]*)$', self.name_error,
-                                         'Неверные символы')), '%P'))
-
-        self.surname_label = Label(master=frame2, text="Фамилия:")
-        self.surname_label.grid(row=4, column=0, padx=3, pady=3)
-        self.surname_input = ttk.Entry(master=frame2)
-        self.surname_input.grid(row=4, column=1, padx=3, pady=3)
-        self.surname_error = Label(master=frame2)
-        self.surname_error.grid(row=4, column=2, padx=3, pady=3)
-        self.surname_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'^(?:[А-ЯЁ][а-яё]*|[A-Z][a-z]*)$', self.surname_error,
-                                         'Некорректная фамилия')), '%P'))
-
-        self.phone_label = Label(master=frame2, text="Телефон:")
-        self.phone_label.grid(row=5, column=0, padx=3, pady=3)
-        self.phone_input = ttk.Entry(master=frame2)
-        self.phone_input.grid(row=5, column=1, padx=3, pady=3)
-        self.phone_error = Label(master=frame2)
-        self.phone_error.grid(row=5, column=2, padx=3, pady=3)
-        self.phone_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'^(?:[8][0-9]{10}|[+][0-9]{10,})$', self.phone_error,
-                                         'Некорректный номер телефон')), '%P'))
-
-        self.email_label = Label(master=frame2, text="Почта:")
-        self.email_label.grid(row=6, column=0, padx=3, pady=3)
-        self.email_input = ttk.Entry(master=frame2)
-        self.email_input.grid(row=6, column=1, padx=3, pady=3)
-        self.email_error = Label(master=frame2)
-        self.email_error.grid(row=6, column=2, padx=3, pady=3)
-        self.email_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'^[a-zA-Z0-9!#$%^&*()=_+?/><,~`-]{1,}[@][a-zA-Z]{1,}[.][a-zA-Z]{2,3}$',
-                                         self.email_error,
-                                         'Почта указана неверно')), '%P'))
-
-        self.birthdate_label = Label(master=frame2, text="День рождения:")
-        self.birthdate_label.grid(row=7, column=0, padx=3, pady=3)
-        self.birthdate_input = ttk.Entry(master=frame2)
-        self.birthdate_input.grid(row=7, column=1, padx=3, pady=3)
-        self.birthdate_error = Label(master=frame2)
-        self.birthdate_error.grid(row=7, column=2, padx=3, pady=3)
-        self.birthdate_input.configure(validate='focusout', validatecommand=(self.register(
-            lambda value: self.validator(value, r'[1-2][0 - 9]{3}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1-2][0-9]|3[0-1])',
-                                         self.birthdate_error,
-                                         'Формат даты: ГГГГ-ММ-ДД')), '%P'))
-
-        self.status_label = Label(master=frame2, text="Статус*:")
-        self.status_label.grid(row=8, column=0, padx=3, pady=3)
-        self.statuses_list = list(self.get_statuses_api_func().keys())
-        self.status_combobox = ttk.Combobox(master=frame2, values=self.statuses_list)
-        self.status_combobox.grid(row=8, column=1, padx=3, pady=3)
-        self.status_error = Label(master=frame2)
-        self.status_error.grid(row=8, column=2, padx=3, pady=3)
-
-        self.add_user_button = ttk.Button(master=frame2, text="Добавить", command=self.add_user)
+        self.add_user_button = ttk.Button(master=frame2, text="Добавить",
+                                          command=lambda: self.add_user(add_user_inputs))
         self.add_user_button.grid(row=9, column=1, padx=3, pady=3)
 
         # --- tab 1, table of users ---
@@ -377,17 +312,26 @@ class Window(Tk):
         self.users_table.pack(fill=BOTH, expand=True)
         horizontal_scrollbar.pack(side=BOTTOM, fill=X)
 
-    def add_user(self):
-        login = self.login_input.get()
-        password = self.password_input.get()
-        name = self.name_input.get()
-        surname = self.surname_input.get()
-        phone = self.phone_input.get() if self.phone_input.get() != '' else None
-        email = self.email_input.get() if self.email_input.get() != '' else None
-        birthdate = self.birthdate_input.get() if self.birthdate_input.get() != '' else None
-        status = self.get_statuses_api_func().get(self.status_combobox.get())
-        user = User(0, login, password, name, surname, phone, email, birthdate, status)
+    def create_user(self, login_input, password_input, name_input, surname_input, phone_input, email_input,
+                    birthdate_input, status_input, id=0) -> User:
+        login = login_input.get()
+        password = password_input.get()
+        name = name_input.get()
+        surname = surname_input.get()
+        phone = phone_input.get() if phone_input.get() != '' else None
+        email = email_input.get() if email_input.get() != '' else None
+        birthdate = birthdate_input.get() if birthdate_input.get() != '' else None
+        status = self.get_statuses_api_func().get(status_input.get()) if re.fullmatch('0-9', status_input.get()) else int(status_input.get())
+        user = User(id, login, password, name, surname, phone, email, birthdate, status)
+        return user
+
+    def add_user(self, user_properties_inputs):
+        user = self.create_user(*user_properties_inputs)
         self.add_user_api_func(user)
+
+    def edit_user(self, user_properties_inputs):
+        user = self.create_user(*user_properties_inputs, id=int(self.edit_id_input.get()))
+        self.edit_user_api_func(user)
 
     def load_users_list(self):
         users = self.load_users_api_func()
@@ -406,5 +350,138 @@ class Window(Tk):
         error_label.configure(text='')
         return True
 
-    def find_user_for_edit(self):
-        pass
+    def find_user_for_edit_by_id(self, user_properties_inputs):
+        try:
+            user = self.get_user_by_id_api_func(int(self.edit_id_input.get()))
+            user_properties = (user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
+                 user.status)
+            for i, input in enumerate(user_properties_inputs):
+                if not user_properties[i] is None:
+                    input.delete(0, END)
+                    input.insert(0, user_properties[i])
+            self.edit_id_error.configure(text="")
+        except Exception:
+            self.edit_id_error.configure(text="Такого пользователя не нашлось")
+
+
+    def initialization_user_properties_widgets(self, root, start_row) -> dict[str: dict[str: ttk.Widget]]:
+        widgets = {}
+
+        login_label = Label(master=root, text="Логин*:")
+        login_label.grid(row=start_row, column=0, padx=3, pady=3)
+        login_input = ttk.Entry(master=root)
+        login_input.grid(row=start_row, column=1, padx=3, pady=3)
+        login_error = Label(master=root)
+        login_error.grid(row=start_row, column=2, padx=3, pady=3)
+        login_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'[a-zA-Z0-9!@#$%^&*()=_+?/><.,~`-]{8,}', login_error,
+                                         'Неверная длина или символы')), '%P'))
+        widgets["login"] = {}
+        widgets["login"]["label"] = login_label
+        widgets["login"]["input"] = login_input
+        widgets["login"]["error"] = login_error
+        start_row += 1
+
+        password_label = Label(master=root, text="Пароль*:")
+        password_label.grid(row=start_row, column=0, padx=3, pady=3)
+        password_input = ttk.Entry(master=root)
+        password_input.grid(row=start_row, column=1, padx=3, pady=3)
+        password_error = Label(master=root)
+        password_error.grid(row=start_row, column=2, padx=3, pady=3)
+        password_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'[a-zA-Z0-9!@#$%^&*()=_+?/><.,~`-]{8,}', password_error,
+                                         'Неверная длина или неверные символы')), '%P'))
+        widgets["password"] = {}
+        widgets["password"]["label"] = password_label
+        widgets["password"]["input"] = password_input
+        widgets["password"]["error"] = password_error
+        start_row += 1
+
+        name_label = Label(master=root, text="Имя*:")
+        name_label.grid(row=start_row, column=0, padx=3, pady=3)
+        name_input = ttk.Entry(master=root)
+        name_input.grid(row=start_row, column=1, padx=3, pady=3)
+        name_error = Label(master=root)
+        name_error.grid(row=start_row, column=2, padx=3, pady=3)
+        name_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'^(?:[А-ЯЁ][а-яё]*|[A-Z][a-z]*)$', name_error,
+                                         'Неверные символы')), '%P'))
+        widgets["name"] = {}
+        widgets["name"]["label"] = name_label
+        widgets["name"]["input"] = name_input
+        widgets["name"]["error"] = name_error
+        start_row += 1
+
+        surname_label = Label(master=root, text="Фамилия:")
+        surname_label.grid(row=start_row, column=0, padx=3, pady=3)
+        surname_input = ttk.Entry(master=root)
+        surname_input.grid(row=start_row, column=1, padx=3, pady=3)
+        surname_error = Label(master=root)
+        surname_error.grid(row=start_row, column=2, padx=3, pady=3)
+        surname_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'^(?:[А-ЯЁ][а-яё]*|[A-Z][a-z]*)$', surname_error,
+                                         'Некорректная фамилия')), '%P'))
+        widgets["surname"] = {}
+        widgets["surname"]["label"] = surname_label
+        widgets["surname"]["input"] = surname_input
+        widgets["surname"]["error"] = surname_error
+        start_row += 1
+
+        phone_label = Label(master=root, text="Телефон:")
+        phone_label.grid(row=start_row, column=0, padx=3, pady=3)
+        phone_input = ttk.Entry(master=root)
+        phone_input.grid(row=start_row, column=1, padx=3, pady=3)
+        phone_error = Label(master=root)
+        phone_error.grid(row=start_row, column=2, padx=3, pady=3)
+        phone_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'^(?:[8][0-9]{10}|[+][0-9]{10,})$', phone_error,
+                                         'Некорректный номер телефон')), '%P'))
+        widgets["phone"] = {}
+        widgets["phone"]["label"] = phone_label
+        widgets["phone"]["input"] = phone_input
+        widgets["phone"]["error"] = phone_error
+        start_row += 1
+
+        email_label = Label(master=root, text="Почта:")
+        email_label.grid(row=start_row, column=0, padx=3, pady=3)
+        email_input = ttk.Entry(master=root)
+        email_input.grid(row=start_row, column=1, padx=3, pady=3)
+        email_error = Label(master=root)
+        email_error.grid(row=start_row, column=2, padx=3, pady=3)
+        email_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'^[a-zA-Z0-9!#$%^&*()=_+?/><,~`-]{1,}[@][a-zA-Z]{1,}[.][a-zA-Z]{2,3}$',
+                                         email_error,
+                                         'Почта указана неверно')), '%P'))
+        widgets["email"] = {}
+        widgets["email"]["label"] = email_label
+        widgets["email"]["input"] = email_input
+        widgets["email"]["error"] = email_error
+        start_row += 1
+
+        birthdate_label = Label(master=root, text="День рождения:")
+        birthdate_label.grid(row=start_row, column=0, padx=3, pady=3)
+        birthdate_input = ttk.Entry(master=root)
+        birthdate_input.grid(row=start_row, column=1, padx=3, pady=3)
+        birthdate_error = Label(master=root)
+        birthdate_error.grid(row=start_row, column=2, padx=3, pady=3)
+        birthdate_input.configure(validate='focusout', validatecommand=(self.register(
+            lambda value: self.validator(value, r'[1-2][0 - 9]{3}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1-2][0-9]|3[0-1])',
+                                         birthdate_error,
+                                         'Формат даты: ГГГГ-ММ-ДД')), '%P'))
+        widgets["birthdate"] = {}
+        widgets["birthdate"]["label"] = birthdate_label
+        widgets["birthdate"]["input"] = birthdate_input
+        widgets["birthdate"]["error"] = birthdate_error
+        start_row += 1
+
+        status_label = Label(master=root, text="Статус*:")
+        status_label.grid(row=start_row, column=0, padx=3, pady=3)
+        statuses_list = list(self.get_statuses_api_func().keys())
+        status_combobox = ttk.Combobox(master=root, values=statuses_list)
+        status_combobox.grid(row=start_row, column=1, padx=3, pady=3)
+
+        widgets["status"] = {}
+        widgets["status"]["label"] = status_label
+        widgets["status"]["input"] = status_combobox
+
+        return widgets
