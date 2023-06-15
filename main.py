@@ -62,7 +62,7 @@ class PostServiceAPI:
         """)
 
     def setup_interface(self):
-        window = Window(self.get_statuses, self.add_new_user, self.get_all_users, self.edit_user, self.get_user_by_id)
+        window = Window(self.get_statuses, self.add_new_user, self.get_all_users, self.edit_user, self.get_user_by_id, self.delete_user_by_id)
         window.mainloop()
 
     def get_all_users(self):
@@ -99,6 +99,9 @@ class PostServiceAPI:
     def get_user_by_id(self, id: int) -> User:
         self.cur.execute("SELECT * FROM users WHERE userid=?", (id,))
         return User(*self.cur.fetchone())
+
+    def delete_user_by_id(self, id: int):
+        self.cur.execute("DELETE FROM users WHERE userid=?", (id,))
 
 
 API = PostServiceAPI()

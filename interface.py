@@ -221,7 +221,8 @@ class Order:
 
 class Window(Tk):
 
-    def __init__(self, get_statuses_dict_func, add_user_func, load_user_func, edit_user_func, get_user_by_id_func):
+    def __init__(self, get_statuses_dict_func, add_user_func, load_user_func, edit_user_func, get_user_by_id_func,
+                 delete_user_by_id_func):
         super().__init__()
         self.title("Post Service")
         self.geometry("+300+100")
@@ -233,6 +234,7 @@ class Window(Tk):
         self.get_statuses_api_func = get_statuses_dict_func
         self.edit_user_api_func = edit_user_func
         self.get_user_by_id_api_func = get_user_by_id_func
+        self.delete_user_by_id_api_func = delete_user_by_id_func
 
         notebook = ttk.Notebook()
         notebook.pack(expand=True, fill=BOTH)
@@ -249,7 +251,7 @@ class Window(Tk):
 
         frame3 = ttk.Frame(notebook)
         frame3.pack()
-        notebook.add(frame3, text="Редактирование")
+        notebook.add(frame3, text="Редактирование пользователя")
 
         frame4 = ttk.Frame(notebook)
         frame4.pack()
@@ -272,8 +274,11 @@ class Window(Tk):
         self.find_user_button.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10))
 
         self.edit_user_button = ttk.Button(master=frame3, text="Сохранить",
-                                          command=lambda: self.edit_user(edit_user_inputs))
+                                           command=lambda: self.edit_user(edit_user_inputs))
         self.edit_user_button.grid(row=10, column=1, padx=3, pady=3)
+
+        self.delete_user_button = ttk.Button(frame3, text='Удалить', command=lambda: self.delete_user(edit_user_inputs), state=DISABLED)
+        self.delete_user_button.grid(row=10, column=0, padx=3, pady=3)
 
         # --- tab 2, register user ---
 
@@ -321,9 +326,17 @@ class Window(Tk):
         phone = phone_input.get() if phone_input.get() != '' else None
         email = email_input.get() if email_input.get() != '' else None
         birthdate = birthdate_input.get() if birthdate_input.get() != '' else None
-        status = self.get_statuses_api_func().get(status_input.get()) if re.fullmatch('0-9', status_input.get()) else int(status_input.get())
+        status = self.get_statuses_api_func().get(status_input.get()) if re.fullmatch('0-9',
+                                                                                      status_input.get()) else int(
+            status_input.get())
         user = User(id, login, password, name, surname, phone, email, birthdate, status)
         return user
+
+    def delete_user(self, user_properties_inputs):
+        self.delete_user_by_id_api_func(int(self.edit_id_input.get()))
+        self.delete_user_button["state"] = DISABLED
+        for input in user_properties_inputs:
+            input.delete(0, END)
 
     def add_user(self, user_properties_inputs):
         user = self.create_user(*user_properties_inputs)
@@ -353,16 +366,18 @@ class Window(Tk):
     def find_user_for_edit_by_id(self, user_properties_inputs):
         try:
             user = self.get_user_by_id_api_func(int(self.edit_id_input.get()))
-            user_properties = (user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
-                 user.status)
+            user_properties = (
+                user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
+                user.status)
             for i, input in enumerate(user_properties_inputs):
                 if not user_properties[i] is None:
                     input.delete(0, END)
                     input.insert(0, user_properties[i])
             self.edit_id_error.configure(text="")
+            self.delete_user_button["state"] = NORMAL
         except Exception:
             self.edit_id_error.configure(text="Такого пользователя не нашлось")
-
+            self.delete_user_button["state"] = DISABLED
 
     def initialization_user_properties_widgets(self, root, start_row) -> dict[str: dict[str: ttk.Widget]]:
         widgets = {}
