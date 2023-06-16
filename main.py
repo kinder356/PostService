@@ -61,11 +61,11 @@ class PostServiceAPI:
            status TEXT NOT NULL UNIQUE);
         """)
 
-    def setup_interface(self):
-        window = Window(self.get_statuses, self.add_new_user, self.get_all_users, self.edit_user, self.get_user_by_id, self.delete_user_by_id)
+    def setup_interface(self) -> None:
+        window = Window(self)
         window.mainloop()
 
-    def get_all_users(self):
+    def get_all_users(self) -> list:
         self.cur.execute("SELECT * FROM users")
         rows = self.cur.fetchall()
         for row in rows:
@@ -81,7 +81,7 @@ class PostServiceAPI:
             user._status = row[8]
             yield user
 
-    def add_new_user(self, user: User):
+    def add_new_user(self, user: User) -> None:
         self.cur.execute(
             "INSERT INTO users (login, password, name, surname, phone, email, birthdate, status) values (?,?,?,?,?,?,?,?)",
             (user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
@@ -92,16 +92,25 @@ class PostServiceAPI:
         self.cur.execute("SELECT * FROM userstatuses")
         return dict((v, k) for k, v in self.cur.fetchall())
 
-    def edit_user(self, user: User):
-        self.cur.execute("UPDATE users SET login=?, password=?, name=?, surname=?, phone=?, email=?, birthdate=?, status=? WHERE userid=?", (user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
+    def edit_user(self, user: User) -> None:
+        self.cur.execute(
+            "UPDATE users SET login=?, password=?, name=?, surname=?, phone=?, email=?, birthdate=?, status=? WHERE userid=?",
+            (user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
              user.status, user.id))
 
     def get_user_by_id(self, id: int) -> User:
         self.cur.execute("SELECT * FROM users WHERE userid=?", (id,))
         return User(*self.cur.fetchone())
 
-    def delete_user_by_id(self, id: int):
+    def delete_user_by_id(self, id: int) -> None:
         self.cur.execute("DELETE FROM users WHERE userid=?", (id,))
+
+    def add_address(self, address: Address) -> None:
+        self.cur.execute(
+            "INSERT INTO addresses (country, city, street, house, flat, postindex, commentary) values (?, ?, ?, ?, ?, ?, ?)", (
+                address.country, address.city, address.street, address.house, address.flat, address.post_index,
+                address.commentary))
+        self.conn.commit()
 
 
 API = PostServiceAPI()

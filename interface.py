@@ -208,6 +208,49 @@ class Address:
     _post_index = ""
     _commentary = ""
 
+    @property
+    def id(self) -> int:
+        return self._id
+
+    @property
+    def country(self) -> str:
+        return self._country
+
+    @property
+    def city(self) -> str:
+        return self._city
+
+    @property
+    def street(self) -> str:
+        return self._street
+
+    @property
+    def house(self) -> str:
+        return self._house
+
+    @property
+    def flat(self) -> str:
+        return self._flat
+
+    @property
+    def post_index(self) -> str:
+        return self._post_index
+
+    @property
+    def commentary(self) -> str:
+        return self._commentary
+
+    def __init__(self, address_id: int, country: str, city: str, street: str, house: str, flat: str, post_index: str,
+                 commentary: str):
+        self._id = address_id
+        self._country = country
+        self._city = city
+        self._street = street
+        self._house = house
+        self._flat = flat
+        self._post_index = post_index
+        self._commentary = commentary
+
 
 class Order:
     _id = 0
@@ -221,20 +264,20 @@ class Order:
 
 class Window(Tk):
 
-    def __init__(self, get_statuses_dict_func, add_user_func, load_user_func, edit_user_func, get_user_by_id_func,
-                 delete_user_by_id_func):
+    def __init__(self, API):
         super().__init__()
         self.title("Post Service")
         self.geometry("+300+100")
 
         # --- functions ---
 
-        self.add_user_api_func = add_user_func
-        self.load_users_api_func = load_user_func
-        self.get_statuses_api_func = get_statuses_dict_func
-        self.edit_user_api_func = edit_user_func
-        self.get_user_by_id_api_func = get_user_by_id_func
-        self.delete_user_by_id_api_func = delete_user_by_id_func
+        self.add_user_api_func = API.add_new_user
+        self.load_users_api_func = API.get_all_users
+        self.get_statuses_api_func = API.get_statuses
+        self.edit_user_api_func = API.edit_user
+        self.get_user_by_id_api_func = API.get_user_by_id
+        self.delete_user_by_id_api_func = API.delete_user_by_id
+        self.add_address_api_func = API.add_address
 
         notebook = ttk.Notebook()
         notebook.pack(expand=True, fill=BOTH)
@@ -243,11 +286,11 @@ class Window(Tk):
 
         frame1 = ttk.Frame(notebook)
         frame1.pack()
-        notebook.add(frame1, text="Пользователи")
+        notebook.add(frame1, text="Просмотр базы данных")
 
         frame2 = ttk.Frame(notebook)
         frame2.pack()
-        notebook.add(frame2, text="Добавление")
+        notebook.add(frame2, text="Добавление пользователя")
 
         frame3 = ttk.Frame(notebook)
         frame3.pack()
@@ -255,7 +298,30 @@ class Window(Tk):
 
         frame4 = ttk.Frame(notebook)
         frame4.pack()
-        notebook.add(frame4, text="Заказы")
+        notebook.add(frame4, text="Добавление адреса")
+
+        # поиск по id для адреса
+        # self.add_address_id_label, self.add_address_id_input, self.add_address_id_error = Window.add_simple_property_row(
+        #     frame5, 0, "ID: ", True, (10, 3), 10)
+        #
+        # self.find_address_button = ttk.Button(frame5, text='Найти',
+        #                                                command=lambda: self.find_user_for_edit_by_id(edit_user_inputs))
+        # self.find_address_button.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10))
+
+        # --- tab 4, add address ---
+
+        start_row = 1
+        add_address_rows_properties = dict(country=("Country: ", 0, False), city=("City: ", 1, False),
+                                           street=("Street: ", 2, False), house=("House: ", 3, False),
+                                           flat=("Flat", 4, False),
+                                           post_index=("Post index: ", 5, False), commentary=("Commentary: ", 6, False))
+        self.add_address_properties_rows: dict = dict(
+            ((k, Window.add_simple_property_row(frame4, v[1] + start_row, v[0], v[2])) for k, v in
+             add_address_rows_properties.items()))
+        add_address_inputs = dict(((k, v[1]) for k, v in self.add_address_properties_rows.items()))
+        self.add_address_find_user_button = ttk.Button(frame4, text='Добавить адрес',
+                                                       command=lambda: self.add_address(add_address_inputs))
+        self.add_address_find_user_button.grid(row=8, column=0, columnspan=2, padx=10, pady=10)
 
         # --- tab 3, edit user ---
 
@@ -269,15 +335,16 @@ class Window(Tk):
         edit_user_properties_widgets: dict = self.initialization_user_properties_widgets(frame3, 2)
         edit_user_inputs = [i["input"] for i in edit_user_properties_widgets.values()]
 
-        self.find_user_button = ttk.Button(frame3, text='Найти',
-                                           command=lambda: self.find_user_for_edit_by_id(edit_user_inputs))
-        self.find_user_button.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10))
+        self.edit_user_find_user_button = ttk.Button(frame3, text='Найти',
+                                                     command=lambda: self.find_user_for_edit_by_id(edit_user_inputs))
+        self.edit_user_find_user_button.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10))
 
         self.edit_user_button = ttk.Button(master=frame3, text="Сохранить",
                                            command=lambda: self.edit_user(edit_user_inputs))
         self.edit_user_button.grid(row=10, column=1, padx=3, pady=3)
 
-        self.delete_user_button = ttk.Button(frame3, text='Удалить', command=lambda: self.delete_user(edit_user_inputs), state=DISABLED)
+        self.delete_user_button = ttk.Button(frame3, text='Удалить', command=lambda: self.delete_user(edit_user_inputs),
+                                             state=DISABLED)
         self.delete_user_button.grid(row=10, column=0, padx=3, pady=3)
 
         # --- tab 2, register user ---
@@ -317,6 +384,22 @@ class Window(Tk):
         self.users_table.pack(fill=BOTH, expand=True)
         horizontal_scrollbar.pack(side=BOTTOM, fill=X)
 
+    # --- address methods ---
+    def add_address(self, address_properties_inputs: dict[str: Entry]) -> None:
+        # country, city, street, house, flat, postindex, commentary
+        print(address_properties_inputs)
+        country = address_properties_inputs["country"].get()
+        city = address_properties_inputs["city"].get()
+        street = address_properties_inputs["street"].get()
+        house = address_properties_inputs["house"].get()
+        flat = address_properties_inputs["flat"].get()
+        post_index = address_properties_inputs["post_index"].get()
+        commentary = address_properties_inputs["commentary"].get()
+        address = Address(0, country, city, street, house, flat, post_index, commentary)
+        self.add_address_api_func(address)
+
+    # --- user methods ---
+
     def create_user(self, login_input, password_input, name_input, surname_input, phone_input, email_input,
                     birthdate_input, status_input, id=0) -> User:
         login = login_input.get()
@@ -346,6 +429,13 @@ class Window(Tk):
         user = self.create_user(*user_properties_inputs, id=int(self.edit_id_input.get()))
         self.edit_user_api_func(user)
 
+    def validator(self, value, pattern, error_label, error_text):
+        if re.fullmatch(pattern, value) is None:
+            error_label.configure(text=error_text)
+            return False
+        error_label.configure(text='')
+        return True
+
     def load_users_list(self):
         users = self.load_users_api_func()
         for i in self.users_table.get_children():
@@ -355,13 +445,6 @@ class Window(Tk):
             self.users_table.insert("", END, values=(
                 user.id, user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
                 user.status))
-
-    def validator(self, value, pattern, error_label, error_text):
-        if re.fullmatch(pattern, value) is None:
-            error_label.configure(text=error_text)
-            return False
-        error_label.configure(text='')
-        return True
 
     def find_user_for_edit_by_id(self, user_properties_inputs):
         try:
@@ -375,7 +458,7 @@ class Window(Tk):
                     input.insert(0, user_properties[i])
             self.edit_id_error.configure(text="")
             self.delete_user_button["state"] = NORMAL
-        except Exception:
+        except:
             self.edit_id_error.configure(text="Такого пользователя не нашлось")
             self.delete_user_button["state"] = DISABLED
 
@@ -500,3 +583,18 @@ class Window(Tk):
         widgets["status"]["input"] = status_combobox
 
         return widgets
+
+    # --- other methods ---
+
+    @staticmethod
+    def add_simple_property_row(master, row: int, text: str, has_error_label: bool, padx: ... = 3,
+                                pady: ... = 3) -> tuple:
+        label = Label(master=master, text=text)
+        label.grid(row=row, column=0, padx=padx, pady=pady)
+        entry = ttk.Entry(master=master)
+        entry.grid(row=row, column=1, padx=padx, pady=pady)
+        if has_error_label:
+            error = Label(master=master)
+            error.grid(row=row, column=2, padx=padx, pady=pady)
+            return label, entry, error
+        return label, entry
