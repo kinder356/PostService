@@ -212,44 +212,93 @@ class Address:
     def id(self) -> int:
         return self._id
 
+    @id.setter
+    def id(self, value):
+        if value is None or type(value) != int:
+            raise ValueError("invalid ID")
+        self._id = value
+
     @property
     def country(self) -> str:
         return self._country
+
+    @country.setter
+    def country(self, value):
+        if value == "":
+            raise ValueError("invalid country")
+        print(value)
+        self._country = value
 
     @property
     def city(self) -> str:
         return self._city
 
+    @city.setter
+    def city(self, value):
+        if value == "":
+            raise ValueError("invalid city")
+        self._city = value
+
     @property
     def street(self) -> str:
         return self._street
+
+    @street.setter
+    def street(self, value):
+        if value == "":
+            raise ValueError("invalid street")
+        self._street = value
 
     @property
     def house(self) -> str:
         return self._house
 
+    @house.setter
+    def house(self, value):
+        if value == "":
+            raise ValueError("invalid house")
+        self._house = value
+
     @property
     def flat(self) -> str:
         return self._flat
+
+    @flat.setter
+    def flat(self, value):
+        if value == "":
+            raise ValueError("invalid flat")
+        self._flat = value
 
     @property
     def post_index(self) -> str:
         return self._post_index
 
+    @post_index.setter
+    def post_index(self, value):
+        if value == "":
+            raise ValueError("invalid post index")
+        self._post_index = value
+
     @property
     def commentary(self) -> str:
         return self._commentary
 
+    @commentary.setter
+    def commentary(self, value):
+        if value == "":
+            raise ValueError("invalid commentary")
+        self._commentary = value
+
     def __init__(self, address_id: int, country: str, city: str, street: str, house: str, flat: str, post_index: str,
                  commentary: str):
-        self._id = address_id
-        self._country = country
-        self._city = city
-        self._street = street
-        self._house = house
-        self._flat = flat
-        self._post_index = post_index
-        self._commentary = commentary
+        self.id = address_id
+        self.country = country
+        self.city = city
+        self.street = street
+        self.house = house
+        self.flat = flat
+        self.post_index = post_index
+        self.commentary = commentary
 
 
 class Order:
@@ -278,11 +327,12 @@ class Window(Tk):
         self.get_user_by_id_api_func = API.get_user_by_id
         self.delete_user_by_id_api_func = API.delete_user_by_id
         self.add_address_api_func = API.add_address
+        self.delete_address_by_id_api_func = API.delete_address_by_id
 
         notebook = ttk.Notebook()
         notebook.pack(expand=True, fill=BOTH)
 
-        # --- tabs init ---
+        # --- tabs start ---
 
         frame1 = ttk.Frame(notebook)
         frame1.pack()
@@ -298,17 +348,23 @@ class Window(Tk):
 
         frame4 = ttk.Frame(notebook)
         frame4.pack()
-        notebook.add(frame4, text="Добавление адреса")
+        notebook.add(frame4, text="Адреса")
 
         # поиск по id для адреса
-        # self.add_address_id_label, self.add_address_id_input, self.add_address_id_error = Window.add_simple_property_row(
-        #     frame5, 0, "ID: ", True, (10, 3), 10)
-        #
-        # self.find_address_button = ttk.Button(frame5, text='Найти',
-        #                                                command=lambda: self.find_user_for_edit_by_id(edit_user_inputs))
-        # self.find_address_button.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10))
 
-        # --- tab 4, add address ---
+
+        # --- tab 4, add address, delete address ---
+
+        address_container = Frame(frame4)
+        address_container.pack()
+
+        # - add address -
+
+        child_frame_add_address = Frame(master=address_container)
+        child_frame_add_address.pack(padx=30, side=LEFT)
+
+        Label(child_frame_add_address, text="Добавление адреса", font=14).grid(row=0, column=0, columnspan=2, padx=20,
+                                                                               pady=20)
 
         start_row = 1
         add_address_rows_properties = dict(country=("Country: ", 0, False), city=("City: ", 1, False),
@@ -316,12 +372,29 @@ class Window(Tk):
                                            flat=("Flat", 4, False),
                                            post_index=("Post index: ", 5, False), commentary=("Commentary: ", 6, False))
         self.add_address_properties_rows: dict = dict(
-            ((k, Window.add_simple_property_row(frame4, v[1] + start_row, v[0], v[2])) for k, v in
+            ((k, Window.add_simple_property_row(child_frame_add_address, v[1] + start_row, v[0], v[2])) for k, v in
              add_address_rows_properties.items()))
         add_address_inputs = dict(((k, v[1]) for k, v in self.add_address_properties_rows.items()))
-        self.add_address_find_user_button = ttk.Button(frame4, text='Добавить адрес',
+        self.add_address_find_user_button = ttk.Button(child_frame_add_address, text='Добавить адрес',
                                                        command=lambda: self.add_address(add_address_inputs))
         self.add_address_find_user_button.grid(row=8, column=0, columnspan=2, padx=10, pady=10)
+
+        # - delete address -
+
+        child_frame_delete_address = Frame(master=address_container)
+        child_frame_delete_address.pack(padx=30, side=LEFT, anchor="n")
+
+        Label(child_frame_delete_address, text="Удаление адреса", font=14).grid(row=0, column=0, columnspan=2, padx=20,
+                                                                                pady=20)
+
+        self.delete_address_id_label, self.delete_address_id_input = Window.add_simple_property_row(
+            child_frame_delete_address, 1, "ID: ", False, (10, 3), 10)
+        self.delete_address_id_error = Label(child_frame_delete_address)
+        self.delete_address_id_error.grid(row=3, column=0, columnspan=2, pady=10)
+
+        ttk.Button(master=child_frame_delete_address, text="Удалить", command=self.delete_address_by_id).grid(
+            row=2, column=0,
+            columnspan=3, pady=10)
 
         # --- tab 3, edit user ---
 
@@ -397,6 +470,14 @@ class Window(Tk):
         commentary = address_properties_inputs["commentary"].get()
         address = Address(0, country, city, street, house, flat, post_index, commentary)
         self.add_address_api_func(address)
+
+    def delete_address_by_id(self):
+        try:
+            self.delete_address_by_id_api_func(int(self.delete_address_id_input.get()))
+            self.delete_address_id_error.configure(text="")
+            self.delete_address_id_input.delete(0, END)
+        except:
+            self.delete_address_id_error.configure(text="Ошибка")
 
     # --- user methods ---
 

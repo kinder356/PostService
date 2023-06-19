@@ -103,13 +103,25 @@ class PostServiceAPI:
         return User(*self.cur.fetchone())
 
     def delete_user_by_id(self, id: int) -> None:
+        self.get_user_by_id(id)  # check id in db
         self.cur.execute("DELETE FROM users WHERE userid=?", (id,))
+        self.conn.commit()
 
     def add_address(self, address: Address) -> None:
         self.cur.execute(
-            "INSERT INTO addresses (country, city, street, house, flat, postindex, commentary) values (?, ?, ?, ?, ?, ?, ?)", (
+            "INSERT INTO addresses (country, city, street, house, flat, postindex, commentary) values (?, ?, ?, ?, ?, ?, ?)",
+            (
                 address.country, address.city, address.street, address.house, address.flat, address.post_index,
                 address.commentary))
+        self.conn.commit()
+
+    def get_address_by_id(self, id: int) -> Address:
+        self.cur.execute("SELECT * FROM addresses WHERE addressid=?", (id,))
+        return Address(*self.cur.fetchone())
+
+    def delete_address_by_id(self, id: int) -> None:
+        self.get_address_by_id(id)  # check id in db
+        self.cur.execute("DELETE FROM addresses WHERE addressid=?", (id,))
         self.conn.commit()
 
 
