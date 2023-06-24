@@ -1,5 +1,8 @@
 from tkinter import *
 from tkinter import ttk
+from settings import Settings
+from time import sleep
+from threading import Thread
 import datetime
 import re
 
@@ -197,6 +200,9 @@ class User:
         self.birthdate = birthdate
         self.status = status
 
+    def get_properties(self) -> tuple:
+        return self.id, self.login, self.password, self.name, self.surname, self.phone, self.email, self.birthdate, self.status
+
 
 class Address:
     _id = 0
@@ -226,7 +232,6 @@ class Address:
     def country(self, value):
         if value == "":
             raise ValueError("invalid country")
-        print(value)
         self._country = value
 
     @property
@@ -300,6 +305,9 @@ class Address:
         self.post_index = post_index
         self.commentary = commentary
 
+    def get_properties(self) -> tuple:
+        return self.id, self.country, self.city, self.street, self.house, self.flat, self.post_index, self.commentary
+
 
 class Order:
     _id = 0
@@ -310,24 +318,73 @@ class Order:
     _address_id = 0
     _status = 1
 
+    @property
+    def id(self) -> int:
+        return self._id
+
+    @property
+    def info(self) -> str:
+        return self._info
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @property
+    def sender_id(self) -> int:
+        return self._sender_id
+
+    @property
+    def courier_id(self) -> int:
+        return self._courier_id
+
+    @property
+    def address_id(self) -> int:
+        return self._address_id
+
+    @property
+    def status(self) -> int:
+        return self._status
+
+    def __init__(self, id: int, info: str, description: str, sender_id: int, courier_id, address_id: int, status: int):
+        self._id = id
+        self._info = info
+        self._description = description
+        self._sender_id = sender_id
+        self._courier_id = courier_id
+        self._address_id = address_id
+        self._status = status
+
+    def get_properties(self) -> tuple:
+        return self.id, self.info, self.description, self.sender_id, self.courier_id, self.address_id, self.status
+
 
 class Window(Tk):
 
     def __init__(self, API):
         super().__init__()
         self.title("Post Service")
-        self.geometry("+300+100")
+        self.geometry("1000x350+300+100")
+        self.pack_propagate(False)
 
         # --- functions ---
 
         self.add_user_api_func = API.add_new_user
-        self.load_users_api_func = API.get_all_users
-        self.get_statuses_api_func = API.get_statuses
+        self.get_all_users_api_func = API.get_all_users
+        self.get_user_statuses_api_func = API.get_user_statuses
         self.edit_user_api_func = API.edit_user
         self.get_user_by_id_api_func = API.get_user_by_id
         self.delete_user_by_id_api_func = API.delete_user_by_id
         self.add_address_api_func = API.add_address
         self.delete_address_by_id_api_func = API.delete_address_by_id
+        self.get_order_statuses_api_func = API.get_order_statuses
+        self.add_order_api_func = API.add_order
+        self.get_address_by_id_api_func = API.get_address_by_id
+        self.delete_order_by_id_api_func = API.delete_order_by_id
+        self.get_order_by_id_api_func = API.get_order_by_id
+        self.change_order_status_api_func = API.change_order_status
+        self.get_all_addresses_api_func = API.get_all_addresses
+        self.get_all_orders_api_func = API.get_all_orders
 
         notebook = ttk.Notebook()
         notebook.pack(expand=True, fill=BOTH)
@@ -350,8 +407,85 @@ class Window(Tk):
         frame4.pack()
         notebook.add(frame4, text="Адреса")
 
-        # поиск по id для адреса
+        frame5 = ttk.Frame(notebook)
+        frame5.pack()
+        notebook.add(frame5, text="Заказы")
 
+        # --- tab 5, add orders, delete orders ---
+
+        order_container = Frame(frame5)
+        order_container.pack()
+
+        # - add order -
+
+        child_frame_add_order = Frame(master=order_container)
+        child_frame_add_order.pack(padx=30, side=LEFT)
+
+        Label(child_frame_add_order, text="Добавление заказа", font=14).grid(row=0, column=0, columnspan=2, padx=20,
+                                                                             pady=20)
+
+        start_row = 1
+        add_order_rows_properties = dict(info=("Информация: ", 0, False), description=("Описание: ", 1, False),
+                                         sender_id=("id отправителя: ", 2, True),
+                                         courier_id=("id курьера: ", 3, True),
+                                         address_id=("id адреса", 4, True))
+        self.add_order_properties_rows: dict = dict(
+            ((k, Window.add_simple_property_row(child_frame_add_order, v[1] + start_row, v[0], v[2])) for k, v in
+             add_order_rows_properties.items()))
+
+        status_label = Label(master=child_frame_add_order, text="Статус: ")
+        status_label.grid(row=5 + start_row, column=0)
+        statuses_list = list(self.get_order_statuses_api_func().keys())
+        status_combobox = ttk.Combobox(master=child_frame_add_order, values=statuses_list)
+        status_combobox.grid(row=5 + start_row, column=1, padx=3, pady=3)
+        self.add_order_properties_rows["status"] = (status_label, status_combobox)
+
+        add_order_inputs = dict(((k, v[1]) for k, v in self.add_order_properties_rows.items()))
+        self.add_address_find_user_button = ttk.Button(child_frame_add_order, text='Добавить адрес',
+                                                       command=lambda: self.add_order(add_order_inputs))
+        self.add_address_find_user_button.grid(row=8, column=0, columnspan=2, padx=10, pady=10)
+
+        # - delete order -
+
+        child_frame_delete_order = Frame(master=order_container)
+        child_frame_delete_order.pack(padx=30, side=LEFT, anchor="n")
+
+        Label(child_frame_delete_order, text="Удаление заказа", font=14).grid(row=0, column=0, columnspan=2, padx=20,
+                                                                              pady=20)
+
+        delete_order_id_label, self.delete_order_id_input = Window.add_simple_property_row(
+            child_frame_delete_order, 1, "ID: ", False, (10, 3), 10)
+        self.delete_order_id_error = Label(child_frame_delete_order, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
+        self.delete_order_id_error.grid(row=3, column=0, columnspan=2, pady=10)
+
+        ttk.Button(master=child_frame_delete_order, text="Удалить", command=self.delete_order_by_id).grid(row=2, column=0, columnspan=3, pady=10)
+
+        # - change order status -
+
+        child_frame_change_status_order = Frame(master=order_container)
+        child_frame_change_status_order.pack(padx=30, side=LEFT, anchor="n")
+
+        Label(child_frame_change_status_order, text="Изменение статуса", font=14).grid(row=0, column=0, columnspan=2, padx=20, pady=20)
+
+        change_order_status_id_label, self.change_order_status_id_input = Window.add_simple_property_row(child_frame_change_status_order, 1, "ID: ", False, (10, 3), 10)
+
+        ttk.Button(master=child_frame_change_status_order, text="Найти", command=self.find_order_by_id_for_change_status).grid(row=2, column=0, columnspan=3, pady=5)
+
+        change_order_status_current_order_id_label = Label(master=child_frame_change_status_order, text="Текущий id: ")
+        change_order_status_current_order_id_label.grid(row=3, column=0, pady=0)
+
+        self.change_order_status_current_order_id = Label(master=child_frame_change_status_order, text='', bg="#FFFAFA")
+        self.change_order_status_current_order_id.grid(row=3, column=1, sticky='w', pady=10)
+
+        status_label = Label(master=child_frame_change_status_order, text="Статус: ")
+        status_label.grid(row=4, column=0, pady=(3, 0))
+        self.change_order_status_combobox = ttk.Combobox(master=child_frame_change_status_order, values=statuses_list)
+        self.change_order_status_combobox.grid(row=4, column=1, padx=3, pady=3)
+
+        ttk.Button(master=child_frame_change_status_order, text="Изменить", command=self.save_new_order_status).grid(row=5, column=0, columnspan=3, pady=10)
+
+        self.change_order_status_error = Label(child_frame_change_status_order, text=Settings.EMPTY_ERROR_LABEL_TEXT, fg=Settings.ERROR_COLOR)
+        self.change_order_status_error.grid(row=6, column=0, columnspan=2, pady=10)
 
         # --- tab 4, add address, delete address ---
 
@@ -363,20 +497,17 @@ class Window(Tk):
         child_frame_add_address = Frame(master=address_container)
         child_frame_add_address.pack(padx=30, side=LEFT)
 
-        Label(child_frame_add_address, text="Добавление адреса", font=14).grid(row=0, column=0, columnspan=2, padx=20,
-                                                                               pady=20)
+        Label(child_frame_add_address, text="Добавление адреса", font=14).grid(row=0, column=0, columnspan=2, padx=20, pady=20)
 
         start_row = 1
-        add_address_rows_properties = dict(country=("Country: ", 0, False), city=("City: ", 1, False),
-                                           street=("Street: ", 2, False), house=("House: ", 3, False),
-                                           flat=("Flat", 4, False),
-                                           post_index=("Post index: ", 5, False), commentary=("Commentary: ", 6, False))
-        self.add_address_properties_rows: dict = dict(
-            ((k, Window.add_simple_property_row(child_frame_add_address, v[1] + start_row, v[0], v[2])) for k, v in
-             add_address_rows_properties.items()))
+        add_address_rows_properties = dict(country=("Страна: ", 0, False), city=("Город: ", 1, False),
+                                           street=("Улица: ", 2, False), house=("Дом: ", 3, False),
+                                           flat=("Квартира", 4, False),
+                                           post_index=("Почтовый индекс: ", 5, False),
+                                           commentary=("Комментарий: ", 6, False))
+        self.add_address_properties_rows: dict = dict(((k, Window.add_simple_property_row(child_frame_add_address, v[1] + start_row, v[0], v[2])) for k, v in add_address_rows_properties.items()))
         add_address_inputs = dict(((k, v[1]) for k, v in self.add_address_properties_rows.items()))
-        self.add_address_find_user_button = ttk.Button(child_frame_add_address, text='Добавить адрес',
-                                                       command=lambda: self.add_address(add_address_inputs))
+        self.add_address_find_user_button = ttk.Button(child_frame_add_address, text='Добавить адрес', command=lambda: self.add_address(add_address_inputs))
         self.add_address_find_user_button.grid(row=8, column=0, columnspan=2, padx=10, pady=10)
 
         # - delete address -
@@ -384,17 +515,14 @@ class Window(Tk):
         child_frame_delete_address = Frame(master=address_container)
         child_frame_delete_address.pack(padx=30, side=LEFT, anchor="n")
 
-        Label(child_frame_delete_address, text="Удаление адреса", font=14).grid(row=0, column=0, columnspan=2, padx=20,
-                                                                                pady=20)
+        Label(child_frame_delete_address, text="Удаление адреса", font=14).grid(row=0, column=0, columnspan=2, padx=20, pady=20)
 
         self.delete_address_id_label, self.delete_address_id_input = Window.add_simple_property_row(
             child_frame_delete_address, 1, "ID: ", False, (10, 3), 10)
-        self.delete_address_id_error = Label(child_frame_delete_address)
+        self.delete_address_id_error = Label(child_frame_delete_address, text=Settings.EMPTY_ERROR_LABEL_TEXT, fg=Settings.ERROR_COLOR)
         self.delete_address_id_error.grid(row=3, column=0, columnspan=2, pady=10)
 
-        ttk.Button(master=child_frame_delete_address, text="Удалить", command=self.delete_address_by_id).grid(
-            row=2, column=0,
-            columnspan=3, pady=10)
+        ttk.Button(master=child_frame_delete_address, text="Удалить", command=self.delete_address_by_id).grid(row=2, column=0, columnspan=3, pady=10)
 
         # --- tab 3, edit user ---
 
@@ -402,7 +530,7 @@ class Window(Tk):
         self.edit_id_label.grid(row=0, column=0, padx=(10, 3), pady=10)
         self.edit_id_input = ttk.Entry(master=frame3)
         self.edit_id_input.grid(row=0, column=1, padx=(10, 3), pady=10)
-        self.edit_id_error = Label(master=frame3)
+        self.edit_id_error = Label(master=frame3, text=Settings.EMPTY_ERROR_LABEL_TEXT, fg=Settings.ERROR_COLOR)
         self.edit_id_error.grid(row=0, column=2, padx=(10, 3), pady=10)
 
         edit_user_properties_widgets: dict = self.initialization_user_properties_widgets(frame3, 2)
@@ -434,33 +562,130 @@ class Window(Tk):
 
         # --- tab 1, table of users ---
 
-        columns = ["id", "login", "password", "name", "surname", "phone", "email", "birthdate", "status"]
-        self.users_table = ttk.Treeview(master=frame1, columns=columns, show="headings")
+        style = ttk.Style()
+        style.configure("Treeview", font=("Arial", 10))
 
-        columns_properties = dict(id=("ID", 45), login=("Login", 140), password=("Password", 95), name=("Name", 95),
-                                  surname=("Surname", 95), phone=("Phone", 95), email=("email", 95),
-                                  birthdate=("Birthdate", 95), status=("Status", 45))
-        for i, k in enumerate(columns):
-            self.users_table.heading(k, text=columns_properties[k][0])
-            self.users_table.column(f"#{i + 1}", stretch=NO, width=columns_properties[k][1])
+        self.table = ttk.Treeview(master=frame1, show="headings", style="Treeview")
 
-        vertical_scrollbar = ttk.Scrollbar(master=frame1, orient=VERTICAL, command=self.users_table.yview)
-        self.users_table.configure(yscrollcommand=vertical_scrollbar.set)
+        # self.change_table(Settings.USER_PROPERTY_COLUMN_NAMES, Settings.USER_PROPERTY_COLUMN_PROPERTIES, self.load_users_api_func)
 
-        horizontal_scrollbar = ttk.Scrollbar(master=frame1, orient=HORIZONTAL, command=self.users_table.xview)
-        self.users_table.configure(xscrollcommand=horizontal_scrollbar.set)
+        vertical_scrollbar = ttk.Scrollbar(master=frame1, orient=VERTICAL, command=self.table.yview)
+        self.table.configure(yscrollcommand=vertical_scrollbar.set)
 
-        self.load_users_button = ttk.Button(master=frame1, text="Обновить", command=self.load_users_list)
+        horizontal_scrollbar = ttk.Scrollbar(master=frame1, orient=HORIZONTAL, command=self.table.xview)
+        self.table.configure(xscrollcommand=horizontal_scrollbar.set)
 
-        self.load_users_button.pack(side=BOTTOM, anchor=S)
+        button_container = Frame(master=frame1)
+
+        load_users_button = ttk.Button(master=button_container, text="Пользователи",
+                                       command=lambda: self.change_table(Settings.USER_PROPERTY_COLUMN_NAMES, Settings.USER_PROPERTY_COLUMN_PROPERTIES, self.get_all_users_api_func))
+        load_addresses_button = ttk.Button(master=button_container, text="Адреса",
+                                           command=lambda: self.change_table(Settings.ADDRESS_PROPERTY_COLUMN_NAMES, Settings.ADDRESS_PROPERTY_COLUMN_PROPERTIES, self.get_all_addresses_api_func))
+        load_orders_button = ttk.Button(master=button_container, text="Заказы",
+                                        command=lambda: self.change_table(Settings.ORDER_PROPERTY_COLUMN_NAMES, Settings.ORDER_PROPERTY_COLUMN_PROPERTIES, self.get_all_orders_api_func))
+        load_user_statuses_button = ttk.Button(master=button_container, text="Статусы пользователей",
+                                               command=lambda: self.change_table(Settings.STATUSES_PROPERTY_COLUMN_NAMES, Settings.STATUSES_PROPERTY_COLUMN_PROPERTIES,
+                                                                                 self.get_user_statuses_api_func, True))
+        load_order_statuses_button = ttk.Button(master=button_container, text="Статусы заказов",
+                                                command=lambda: self.change_table(Settings.STATUSES_PROPERTY_COLUMN_NAMES, Settings.STATUSES_PROPERTY_COLUMN_PROPERTIES,
+                                                                                  self.get_order_statuses_api_func, True))
+
+        button_container.pack(side=BOTTOM, anchor=S)
+
         vertical_scrollbar.pack(side=RIGHT, fill=Y)
-        self.users_table.pack(fill=BOTH, expand=True)
+        self.table.pack(fill=BOTH, expand=True)
         horizontal_scrollbar.pack(side=BOTTOM, fill=X)
+
+        load_users_button.pack(side=LEFT, anchor=S)
+        load_addresses_button.pack(side=LEFT, anchor=S)
+        load_orders_button.pack(side=LEFT, anchor=S)
+        load_user_statuses_button.pack(side=LEFT, anchor=S)
+        load_order_statuses_button.pack(side=LEFT, anchor=S)
+
+    # --- table methods ---
+    def change_table(self, names: list[str], properties: dict[str:tuple[...]], get_rows_data_function, is_dict: bool=False) -> None:
+        for i in self.table.get_children():
+            self.table.delete(i)
+
+        self.table.configure(columns=names)
+
+        for i, k in enumerate(properties):
+            self.table.heading(k, text=properties[k][0])
+            self.table.column(f"#{i + 1}", stretch=NO, width=properties[k][1])
+
+        if is_dict:
+            for k, v in get_rows_data_function().items():
+                self.table.insert("", END, values=(v, k))
+            return
+        for obj in get_rows_data_function():
+            self.table.insert("", END, values=obj.get_properties())
+
+    # --- order methods ---
+    def find_order_by_id_for_change_status(self):
+        try:
+            order = self.get_order_by_id_api_func(int(self.change_order_status_id_input.get()))
+            self.change_order_status_current_order_id.configure(text=str(order.id))
+            self.change_order_status_combobox.set(dict((v, k) for k, v in self.get_order_statuses_api_func().items())[order.status])
+            self.change_order_status_error.configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
+        except Exception as ex:
+            self.change_order_status_error.configure(text="Ошибка")
+
+    def save_new_order_status(self):
+        try:
+            self.change_order_status_api_func(self.change_order_status_current_order_id.cget('text'), self.get_order_statuses_api_func().get(self.change_order_status_combobox.get()))
+            self.change_order_status_error.configure(text="")
+
+        except Exception as ex:
+            self.change_order_status_error.configure(text="Ошибка")
+
+    def delete_order_by_id(self):
+        try:
+            self.delete_order_by_id_api_func(int(self.delete_order_id_input.get()))
+            self.delete_order_id_error.configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
+            self.delete_order_id_input.delete(0, END)
+        except:
+            self.delete_order_id_error.configure(text="Ошибка")
+
+    def check_order_ids(self, sender_id, courier_id, address_id) -> None:
+        try:
+            self.get_user_by_id_api_func(sender_id)
+            self.add_order_properties_rows["sender_id"][2].configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
+        except:
+            self.add_order_properties_rows["sender_id"][2].configure(text="!!!")
+            raise ValueError("sender not found")
+        try:
+            courier: User = self.get_user_by_id_api_func(courier_id)
+            if courier.status != self.get_user_statuses_api_func()["courier"]:
+                self.add_order_properties_rows["courier_id"][2].configure(text="!!!")
+                raise ValueError("The user is not a courier.")
+            self.add_order_properties_rows["courier_id"][2].configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
+        except:
+            self.add_order_properties_rows["courier_id"][2].configure(text="!!!")
+            raise ValueError("courier not found")
+        try:
+            self.get_address_by_id_api_func(address_id)
+            self.add_order_properties_rows["address_id"][2].configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
+        except:
+            self.add_order_properties_rows["address_id"][2].configure(text="!!!")
+            raise ValueError("address not found")
+
+    def add_order(self, address_properties_inputs: dict[str: ...]) -> None:
+        info = address_properties_inputs["info"].get()
+        description = address_properties_inputs["description"].get()
+        sender_id = address_properties_inputs["sender_id"].get()
+        courier_id = address_properties_inputs["courier_id"].get()
+        address_id = address_properties_inputs["address_id"].get()
+        status_input = address_properties_inputs["status"]
+        status = int(status_input.get()) if re.fullmatch('0-9',
+                                                         status_input.get()) else self.get_order_statuses_api_func().get(
+            status_input.get())
+        self.check_order_ids(sender_id, courier_id, address_id)
+        order = Order(0, info, description, sender_id, courier_id, address_id, status)
+        self.add_order_api_func(order)
 
     # --- address methods ---
     def add_address(self, address_properties_inputs: dict[str: Entry]) -> None:
         # country, city, street, house, flat, postindex, commentary
-        print(address_properties_inputs)
         country = address_properties_inputs["country"].get()
         city = address_properties_inputs["city"].get()
         street = address_properties_inputs["street"].get()
@@ -471,10 +696,10 @@ class Window(Tk):
         address = Address(0, country, city, street, house, flat, post_index, commentary)
         self.add_address_api_func(address)
 
-    def delete_address_by_id(self):
+    def delete_address_by_id(self) -> None:
         try:
             self.delete_address_by_id_api_func(int(self.delete_address_id_input.get()))
-            self.delete_address_id_error.configure(text="")
+            self.delete_address_id_error.configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
             self.delete_address_id_input.delete(0, END)
         except:
             self.delete_address_id_error.configure(text="Ошибка")
@@ -490,8 +715,8 @@ class Window(Tk):
         phone = phone_input.get() if phone_input.get() != '' else None
         email = email_input.get() if email_input.get() != '' else None
         birthdate = birthdate_input.get() if birthdate_input.get() != '' else None
-        status = self.get_statuses_api_func().get(status_input.get()) if re.fullmatch('0-9',
-                                                                                      status_input.get()) else int(
+        status = int(status_input.get()) if re.fullmatch('0-9',
+                                                         status_input.get()) else self.get_user_statuses_api_func().get(
             status_input.get())
         user = User(id, login, password, name, surname, phone, email, birthdate, status)
         return user
@@ -514,18 +739,8 @@ class Window(Tk):
         if re.fullmatch(pattern, value) is None:
             error_label.configure(text=error_text)
             return False
-        error_label.configure(text='')
+        error_label.configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
         return True
-
-    def load_users_list(self):
-        users = self.load_users_api_func()
-        for i in self.users_table.get_children():
-            self.users_table.delete(i)
-
-        for user in users:
-            self.users_table.insert("", END, values=(
-                user.id, user.login, user.password, user.name, user.surname, user.phone, user.email, user.birthdate,
-                user.status))
 
     def find_user_for_edit_by_id(self, user_properties_inputs):
         try:
@@ -537,7 +752,7 @@ class Window(Tk):
                 if not user_properties[i] is None:
                     input.delete(0, END)
                     input.insert(0, user_properties[i])
-            self.edit_id_error.configure(text="")
+            self.edit_id_error.configure(text=Settings.EMPTY_ERROR_LABEL_TEXT)
             self.delete_user_button["state"] = NORMAL
         except:
             self.edit_id_error.configure(text="Такого пользователя не нашлось")
@@ -550,7 +765,7 @@ class Window(Tk):
         login_label.grid(row=start_row, column=0, padx=3, pady=3)
         login_input = ttk.Entry(master=root)
         login_input.grid(row=start_row, column=1, padx=3, pady=3)
-        login_error = Label(master=root)
+        login_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         login_error.grid(row=start_row, column=2, padx=3, pady=3)
         login_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'[a-zA-Z0-9!@#$%^&*()=_+?/><.,~`-]{8,}', login_error,
@@ -565,7 +780,7 @@ class Window(Tk):
         password_label.grid(row=start_row, column=0, padx=3, pady=3)
         password_input = ttk.Entry(master=root)
         password_input.grid(row=start_row, column=1, padx=3, pady=3)
-        password_error = Label(master=root)
+        password_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         password_error.grid(row=start_row, column=2, padx=3, pady=3)
         password_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'[a-zA-Z0-9!@#$%^&*()=_+?/><.,~`-]{8,}', password_error,
@@ -580,7 +795,7 @@ class Window(Tk):
         name_label.grid(row=start_row, column=0, padx=3, pady=3)
         name_input = ttk.Entry(master=root)
         name_input.grid(row=start_row, column=1, padx=3, pady=3)
-        name_error = Label(master=root)
+        name_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         name_error.grid(row=start_row, column=2, padx=3, pady=3)
         name_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'^(?:[А-ЯЁ][а-яё]*|[A-Z][a-z]*)$', name_error,
@@ -595,7 +810,7 @@ class Window(Tk):
         surname_label.grid(row=start_row, column=0, padx=3, pady=3)
         surname_input = ttk.Entry(master=root)
         surname_input.grid(row=start_row, column=1, padx=3, pady=3)
-        surname_error = Label(master=root)
+        surname_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         surname_error.grid(row=start_row, column=2, padx=3, pady=3)
         surname_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'^(?:[А-ЯЁ][а-яё]*|[A-Z][a-z]*)$', surname_error,
@@ -610,7 +825,7 @@ class Window(Tk):
         phone_label.grid(row=start_row, column=0, padx=3, pady=3)
         phone_input = ttk.Entry(master=root)
         phone_input.grid(row=start_row, column=1, padx=3, pady=3)
-        phone_error = Label(master=root)
+        phone_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         phone_error.grid(row=start_row, column=2, padx=3, pady=3)
         phone_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'^(?:[8][0-9]{10}|[+][0-9]{10,})$', phone_error,
@@ -625,7 +840,7 @@ class Window(Tk):
         email_label.grid(row=start_row, column=0, padx=3, pady=3)
         email_input = ttk.Entry(master=root)
         email_input.grid(row=start_row, column=1, padx=3, pady=3)
-        email_error = Label(master=root)
+        email_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         email_error.grid(row=start_row, column=2, padx=3, pady=3)
         email_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'^[a-zA-Z0-9!#$%^&*()=_+?/><,~`-]{1,}[@][a-zA-Z]{1,}[.][a-zA-Z]{2,3}$',
@@ -641,7 +856,7 @@ class Window(Tk):
         birthdate_label.grid(row=start_row, column=0, padx=3, pady=3)
         birthdate_input = ttk.Entry(master=root)
         birthdate_input.grid(row=start_row, column=1, padx=3, pady=3)
-        birthdate_error = Label(master=root)
+        birthdate_error = Label(master=root, fg=Settings.ERROR_COLOR, text=Settings.EMPTY_ERROR_LABEL_TEXT)
         birthdate_error.grid(row=start_row, column=2, padx=3, pady=3)
         birthdate_input.configure(validate='focusout', validatecommand=(self.register(
             lambda value: self.validator(value, r'[1-2][0 - 9]{3}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[1-2][0-9]|3[0-1])',
@@ -655,7 +870,7 @@ class Window(Tk):
 
         status_label = Label(master=root, text="Статус*:")
         status_label.grid(row=start_row, column=0, padx=3, pady=3)
-        statuses_list = list(self.get_statuses_api_func().keys())
+        statuses_list = list(self.get_user_statuses_api_func().keys())
         status_combobox = ttk.Combobox(master=root, values=statuses_list)
         status_combobox.grid(row=start_row, column=1, padx=3, pady=3)
 
@@ -675,7 +890,7 @@ class Window(Tk):
         entry = ttk.Entry(master=master)
         entry.grid(row=row, column=1, padx=padx, pady=pady)
         if has_error_label:
-            error = Label(master=master)
+            error = Label(master=master, text=Settings.EMPTY_ERROR_LABEL_TEXT, fg=Settings.ERROR_COLOR)
             error.grid(row=row, column=2, padx=padx, pady=pady)
             return label, entry, error
         return label, entry

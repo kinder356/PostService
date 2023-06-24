@@ -88,7 +88,7 @@ class PostServiceAPI:
              user.status))
         self.conn.commit()
 
-    def get_statuses(self) -> dict[str: int]:
+    def get_user_statuses(self) -> dict[str: int]:
         self.cur.execute("SELECT * FROM userstatuses")
         return dict((v, k) for k, v in self.cur.fetchall())
 
@@ -123,6 +123,43 @@ class PostServiceAPI:
         self.get_address_by_id(id)  # check id in db
         self.cur.execute("DELETE FROM addresses WHERE addressid=?", (id,))
         self.conn.commit()
+
+    def get_all_addresses(self) -> list[Address]:
+        self.cur.execute("SELECT * FROM addresses")
+        rows = self.cur.fetchall()
+        for row in rows:
+            address = Address(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7])
+            yield address
+
+    def get_order_statuses(self) -> dict[str: int]:
+        self.cur.execute("SELECT * FROM orderstatuses")
+        return dict((v, k) for k, v in self.cur.fetchall())
+
+    def get_all_orders(self) -> list[Order]:
+        self.cur.execute("SELECT * FROM orders")
+        rows = self.cur.fetchall()
+        for row in rows:
+            order = Order(row[0], row[1], row[2], row[3], row[4], row[5], row[6])
+            yield order
+
+    def get_order_by_id(self, id: int) -> Order:
+        self.cur.execute("SELECT * FROM orders WHERE orderid=?", (id,))
+        return Order(*self.cur.fetchone())
+
+    def add_order(self, order: Order) -> None:
+        self.cur.execute(
+            "INSERT INTO orders (info, description, senderid, courierid, addressid, status) values (?, ?, ?, ?, ?, ?)",
+            (order.info, order.description, order.sender_id, order.courier_id, order.address_id, order.status))
+        self.conn.commit()
+
+    def delete_order_by_id(self, id: int) -> None:
+        self.get_order_by_id(id)  # check id in db
+        self.cur.execute("DELETE FROM orders WHERE orderid=?", (id,))
+        self.conn.commit()
+
+    def change_order_status(self, id: int, status: int) -> None:
+        self.cur.execute(
+            "UPDATE orders SET status=? WHERE orderid=?", (status, id))
 
 
 API = PostServiceAPI()
